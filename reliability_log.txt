@@ -1,0 +1,17 @@
+Initializing DB...
+Created test_audio_match.wav
+Registering media...
+Generated 246 fingerprints.
+Stored in DB with ID 1
+Attempting to identify the same file...
+Match Results (Direct):
+  - Test Audio: Score 1.0 (matches: 246/246)
+Match Results (Identify Clip):
+  Match Found: True
+  Confidence: 1.0
+  Method: audio
+    Step: Extracting audio fingerprints...
+    Step: Extracted 246 audio fingerprints.
+    Step: Matching audio fingerprints against database...
+    Step: Best audio match: "Test Audio" with confidence 100.0%
+    Step: Audio confidence (100.0%) is above threshold (40%). Accepting audio match. Video check skipped.
