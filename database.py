@@ -52,6 +52,7 @@ def init_db():
         );
 
         CREATE INDEX IF NOT EXISTS idx_audio_hash ON audio_fingerprints(fingerprint_hash);
+        CREATE INDEX IF NOT EXISTS idx_audio_hash_cover ON audio_fingerprints(fingerprint_hash, media_id, time_offset);
         CREATE INDEX IF NOT EXISTS idx_video_media ON video_fingerprints(media_id);
         CREATE INDEX IF NOT EXISTS idx_audio_media ON audio_fingerprints(media_id);
     """)
@@ -223,3 +224,28 @@ def get_media_count() -> int:
     count = cursor.fetchone()[0]
     conn.close()
     return count
+
+
+def get_audio_hash_table() -> dict:
+    """
+    Load ALL audio fingerprints into a Python dict for in-memory O(1) lookup.
+    Use this to eliminate SQL round-trips during matching for medium libraries.
+    Returns: dict mapping hash_str → list of (media_id, time_offset, title)
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT af.fingerprint_hash, af.time_offset, af.media_id, m.title
+        FROM audio_fingerprints af
+        JOIN media m ON af.media_id = m.id
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+
+    table = {}
+    for row in rows:
+        h = row['fingerprint_hash']
+        if h not in table:
+            table[h] = []
+        table[h].append((row['media_id'], row['time_offset'], row['title']))
+    return table

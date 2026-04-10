@@ -6,3 +6,5 @@ numpy
 opencv-python
 scipy
 Jinja2
+pybktree
+python-dotenv
