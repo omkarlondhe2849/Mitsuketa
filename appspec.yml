@@ -1,0 +1,54 @@
+version: 0.0
+os: linux
+
+# ─────────────────────────────────────────────────────────
+# AWS CodeDeploy - appspec.yml for Mitsuketa
+# Deploys FastAPI app to /home/ubuntu/mitsuketa on EC2
+# ─────────────────────────────────────────────────────────
+
+files:
+  - source: /
+    destination: /home/ubuntu/mitsuketa
+
+# File permissions
+permissions:
+  - object: /home/ubuntu/mitsuketa
+    pattern: '**'
+    owner: ubuntu
+    group: ubuntu
+    type:
+      - directory
+      - file
+  - object: /home/ubuntu/mitsuketa/scripts
+    pattern: '*.sh'
+    owner: root
+    group: root
+    mode: '755'
+    type:
+      - file
+
+# Deployment lifecycle hooks
+hooks:
+  # 1. Run BEFORE files are copied — stop any existing server
+  BeforeInstall:
+    - location: scripts/stop_server.sh
+      timeout: 300
+      runas: root
+
+  # 2. Run AFTER files are copied — install all dependencies
+  AfterInstall:
+    - location: scripts/install_dependencies.sh
+      timeout: 600
+      runas: root
+
+  # 3. Start the application
+  ApplicationStart:
+    - location: scripts/start_server.sh
+      timeout: 300
+      runas: root
+
+  # 4. Optional validation after start (confirm server is up)
+  ValidateService:
+    - location: scripts/validate_service.sh
+      timeout: 60
+      runas: root

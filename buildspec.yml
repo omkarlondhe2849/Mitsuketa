@@ -1,0 +1,69 @@
+version: 0.2
+
+# ─────────────────────────────────────────────────────────
+# AWS CodeBuild - buildspec.yml for Mitsuketa
+# FastAPI + Uvicorn audio/video fingerprinting app
+# ─────────────────────────────────────────────────────────
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - echo "=== [INSTALL] Setting up build environment ==="
+      - pip install --upgrade pip
+      # Install system-level build tools required by librosa / numpy
+      - apt-get update -y || true
+      - apt-get install -y ffmpeg libsndfile1 || true
+
+  pre_build:
+    commands:
+      - echo "=== [PRE_BUILD] Validating project structure ==="
+      - python3 --version
+      - pip --version
+      # Validate all required deployment files exist
+      - test -f appspec.yml      && echo "appspec.yml OK"      || (echo "MISSING appspec.yml" && exit 1)
+      - test -f requirements.txt && echo "requirements.txt OK" || (echo "MISSING requirements.txt" && exit 1)
+      - test -f main.py          && echo "main.py OK"          || (echo "MISSING main.py" && exit 1)
+      - test -f scripts/install_dependencies.sh && echo "install_dependencies.sh OK" || exit 1
+      - test -f scripts/start_server.sh         && echo "start_server.sh OK"         || exit 1
+      - test -f scripts/stop_server.sh          && echo "stop_server.sh OK"          || exit 1
+
+  build:
+    commands:
+      - echo "=== [BUILD] Installing Python dependencies for validation ==="
+      - pip install -r requirements.txt
+      # Basic syntax check on core Python files
+      - python3 -m py_compile main.py           && echo "main.py syntax OK"
+      - python3 -m py_compile audio_fingerprint.py && echo "audio_fingerprint.py syntax OK"
+      - python3 -m py_compile video_fingerprint.py && echo "video_fingerprint.py syntax OK"
+      - python3 -m py_compile matcher.py        && echo "matcher.py syntax OK"
+      - python3 -m py_compile database.py       && echo "database.py syntax OK"
+      - echo "=== [BUILD] All validation checks passed ==="
+
+  post_build:
+    commands:
+      - echo "=== [POST_BUILD] Build complete. Packaging artifacts. ==="
+      - echo "Build completed on $(date)"
+
+# ─────────────────────────────────────────────────────────
+# Artifacts: everything needed for CodeDeploy to deploy
+# ─────────────────────────────────────────────────────────
+artifacts:
+  files:
+    - '**/*'
+  exclude-paths:
+    # Exclude heavy/unnecessary files from the deployment artifact
+    - '**/__pycache__/**'
+    - '**/*.pyc'
+    - 'mitsuketa.db'
+    - 'media/**'
+    - 'reference_media/**'
+    - '.git/**'
+    - 'debug_output*.txt'
+    - 'test_output.txt'
+  name: mitsuketa-build-artifact
+
+cache:
+  paths:
+    - '/root/.cache/pip/**/*'
