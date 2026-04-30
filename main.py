@@ -86,7 +86,7 @@ async def home(request: Request):
     """
     Serve the UI.
     - If React build exists → serve React's index.html
-    - If Jinja2 template exists → serve legacy template
+    - If legacy template exists → serve as plain HTML (no Jinja2)
     - Otherwise → return JSON health response
     """
     react_index = os.path.join(FRONTEND_BUILD, "index.html")
@@ -95,14 +95,15 @@ async def home(request: Request):
 
     template_index = os.path.join(BASE_DIR, "templates", "index.html")
     if os.path.exists(template_index):
-        return templates.TemplateResponse("index.html", {"request": request})
+        # Serve as plain FileResponse — avoids Jinja2 version incompatibility
+        return FileResponse(template_index, media_type="text/html")
 
     # Fallback: return JSON if no UI is available
     return JSONResponse({
         "status": "ok",
         "app": "Mitsuketa – Find the Source",
         "version": "2.0.0",
-        "message": "API is running. Use /api/health, /api/library, /api/register, /api/identify",
+        "message": "API is running.",
         "endpoints": ["/api/health", "/api/library", "/api/register", "/api/identify", "/api/stats"]
     })
 
