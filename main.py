@@ -51,10 +51,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve existing static files (CSS/JS for legacy fallback)
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+# Only mount /static if directory exists and is not empty
+_static_dir = os.path.join(BASE_DIR, "static")
+if os.path.exists(_static_dir) and os.listdir(_static_dir):
+    app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
-# Serve React build assets (when frontend/dist/ exists)
+# Serve React build assets (when frontend/dist/assets/ exists)
 _react_assets_dir = os.path.join(FRONTEND_BUILD, "assets")
 if os.path.exists(_react_assets_dir):
     app.mount("/assets", StaticFiles(directory=_react_assets_dir), name="react_assets")
@@ -65,7 +67,10 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 @app.on_event("startup")
 async def startup():
-    init_db()
+    try:
+        init_db()
+    except Exception as e:
+        print(f"[STARTUP WARNING] Database init failed: {e}. App will still run.")
 
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
