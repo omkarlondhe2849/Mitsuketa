@@ -10,23 +10,6 @@ files:
   - source: /
     destination: /home/ubuntu/mitsuketa
 
-# File permissions
-permissions:
-  - object: /home/ubuntu/mitsuketa
-    pattern: '**'
-    owner: ubuntu
-    group: ubuntu
-    type:
-      - directory
-      - file
-  - object: /home/ubuntu/mitsuketa/scripts
-    pattern: '*.sh'
-    owner: root
-    group: root
-    mode: '755'
-    type:
-      - file
-
 # Deployment lifecycle hooks
 hooks:
   # 1. Run BEFORE files are copied — stop any existing server
@@ -47,7 +30,7 @@ hooks:
       timeout: 300
       runas: root
 
-  # 4. Optional validation after start (confirm server is up)
+  # 4. Validate server is responding after start
   ValidateService:
     - location: scripts/validate_service.sh
       timeout: 60
