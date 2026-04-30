@@ -5,6 +5,6 @@ librosa
 numpy
 opencv-python
 scipy
-Jinja2
+Jinja2==3.1.2
 pybktree
 python-dotenv
