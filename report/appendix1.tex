@@ -1,0 +1,53 @@
+\newpage
+\chapter{Python Backend Source Code Snippets}
+
+\section*{Audio Fingerprint Hash Generation}
+The following is an excerpt of the core hash generation logic from \texttt{audio\_fingerprint.py}, demonstrating the fan-out constellation map approach:
+
+\begin{verbatim}
+import hashlib
+import numpy as np
+from scipy.ndimage import maximum_filter
+
+def get_peaks(spectrogram, neighborhood_size=20):
+    """Extract high-energy local maxima from spectrogram."""
+    local_max = maximum_filter(spectrogram, size=neighborhood_size)
+    detected_peaks = (spectrogram == local_max)
+    peaks = np.argwhere(detected_peaks)
+    return peaks
+
+def generate_hashes(peaks, fan_value=15):
+    """Generate constellation map hashes from peak pairs."""
+    hashes = []
+    for i, (t1, f1) in enumerate(peaks):
+        for j in range(1, fan_value + 1):
+            if i + j < len(peaks):
+                t2, f2 = peaks[i + j]
+                dt = t2 - t1
+                if 0 < dt <= 200:
+                    h = hashlib.sha1(
+                        f"{f1}|{f2}|{dt}".encode()
+                    ).hexdigest()[:20]
+                    hashes.append((h, t1))
+    return hashes
+\end{verbatim}
+
+\section*{BK-Tree Video Query}
+The following is an excerpt of the BK-Tree query logic from \texttt{matcher.py}:
+
+\begin{verbatim}
+import pybktree
+import imagehash
+
+def build_bktree(video_hashes):
+    """Build a BK-Tree from stored pHash hex strings."""
+    def hamming(a, b):
+        return bin(int(a, 16) ^ int(b, 16)).count('1')
+    tree = pybktree.BKTree(hamming, video_hashes)
+    return tree
+
+def query_bktree(tree, query_hash, threshold=10):
+    """Find all hashes within Hamming distance threshold."""
+    results = tree.find(query_hash, threshold)
+    return results
+\end{verbatim}

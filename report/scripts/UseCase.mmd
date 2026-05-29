@@ -1,0 +1,34 @@
+graph LR
+    %% Actors
+    Viewer((Viewer))
+    Moderator((Moderator))
+    Admin((Admin))
+    
+    %% System Boundary
+    subgraph Mitsuketa Media System
+        UC1([Login / Authenticate])
+        UC2([Identify Unknown Media])
+        UC3([View Library Stats])
+        UC4([Register Reference Media])
+        UC5([Manage Users & Roles])
+    end
+    
+    %% Role Hierarchy / Generalization
+    Moderator -.-> |Inherits| Viewer
+    Admin -.-> |Inherits| Moderator
+    
+    %% Viewer Privileges
+    Viewer --> UC1
+    Viewer --> UC2
+    Viewer --> UC3
+    
+    %% Moderator Privileges
+    Moderator --> UC4
+    
+    %% Admin Privileges
+    Admin --> UC5
+    
+    classDef actor fill:#fff,stroke:#333,stroke-width:2px;
+    classDef uc fill:#e2f0d9,stroke:#333,stroke-width:1px;
+    class Viewer,Moderator,Admin actor;
+    class UC1,UC2,UC3,UC4,UC5 uc;

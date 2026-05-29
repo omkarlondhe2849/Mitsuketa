@@ -1,0 +1,24 @@
+graph LR
+    User([End User]) --> |Web Access| App(React Application)
+    
+    subgraph Web Frontend
+        App --> State[React State]
+        App --> Auth[Auth Context]
+        App --> Views[Dashboard / Library / Admin]
+    end
+    
+    Views -->|HTTP POST| API(FastAPI Server)
+    
+    subgraph Backend Server
+        API --> AuthMW[Role Middleware]
+        API --> AudioModule[Audio Hashing]
+        API --> VideoModule[Video Hashing]
+        API --> MatchModule[Scoring Engine]
+    end
+    
+    subgraph Data Storage
+        AudioModule --> DB[(PostgreSQL)]
+        VideoModule --> DB
+        MatchModule --> DB
+        MatchModule --> BKTree[BK-Tree Index]
+    end

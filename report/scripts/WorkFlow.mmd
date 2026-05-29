@@ -1,0 +1,36 @@
+flowchart TD
+    Start((Start)) --> A{Has Valid JWT?}
+    A -- No --> B[Display Login Page]
+    B --> C[User enters credentials]
+    C --> D[Authenticate against PostgreSQL]
+    D -- Success --> E[Issue JWT Token]
+    D -- Fail --> B
+    E --> F[Dashboard / Identify Tab]
+    A -- Yes --> F
+    
+    F --> G{Select Action}
+    
+    G -- Identify Media --> H[Upload Short Query Clip]
+    H --> I[FastAPI decodes via FFmpeg]
+    I --> J[Generate STFT Audio Hashes]
+    J --> K[Query DB & Compute Temporal Offset]
+    K --> L{Audio Match > 35%?}
+    L -- Yes --> M[Return Audio Match]
+    L -- No --> N[Generate Video pHashes]
+    N --> O[Search BK-Tree Hamming < 10]
+    O --> P[Calculate Combined Confidence]
+    P --> M
+    M --> Z((End Process))
+    
+    G -- Register Media --> Q{Is Role Mod/Admin?}
+    Q -- No --> R[Show Access Denied]
+    Q -- Yes --> S[Upload High Quality Reference]
+    S --> T[Extract ALL Hashes & Frames]
+    T --> U[Batch Insert into PostgreSQL]
+    U --> Z
+    
+    G -- Admin Panel --> V{Is Role Admin?}
+    V -- No --> R
+    V -- Yes --> W[Fetch User List]
+    W --> X[Update Roles / Activate Users]
+    X --> Z

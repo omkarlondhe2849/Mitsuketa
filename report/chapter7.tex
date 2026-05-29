@@ -1,0 +1,80 @@
+\newpage
+\chapter{Results and Discussion}
+
+This chapter presents three structured test cases designed to evaluate the robustness of Mitsuketa under realistic degradation conditions.
+
+\section{Case 1: Audio Identification Under Noisy Conditions}
+
+A 30-second audio clip from a registered music track was passed through a noise injection pipeline: white Gaussian noise (SNR = 10 dB) was added, and the audio was re-encoded at 64 kbps MP3 bitrate before submission as a query.
+
+\begin{table}[h!]
+\centering
+\caption{Audio Identification Results Under Noise}
+\label{tab:case1}
+\begin{tabular}{p{4cm} p{3cm} p{3cm} p{3cm}}
+\noalign{\hrule height 0.5mm}
+\textbf{Query Duration} & \textbf{SNR (dB)} & \textbf{Audio Confidence} & \textbf{Result} \\
+\hline
+30 seconds & 30 (clean) & 94.2\% & Correct \\
+30 seconds & 20          & 88.7\% & Correct \\
+30 seconds & 10          & 76.3\% & Correct \\
+15 seconds & 10          & 61.1\% & Correct \\
+10 seconds & 10          & 48.4\% & Correct \\
+5  seconds & 10          & 22.8\% & Incorrect (fell back to video) \\
+\noalign{\hrule height 0.5mm}
+\end{tabular}
+\end{table}
+
+\textbf{Discussion:} The audio fingerprinting engine maintained correct identification for query clips as short as 10 seconds even at SNR = 10 dB. The performance degradation at 5 seconds is expected because the number of hashes generated from a very short clip is insufficient to build a statistically significant temporal alignment cluster. For 5-second clips, the system correctly fell back to the video matching engine.
+
+\section{Case 2: Video Identification Under Visual Alterations}
+
+The same video registered in the library was subjected to various visual transformations before being submitted as a 30-second query clip.
+
+\begin{table}[h!]
+\centering
+\caption{Video Identification Results Under Visual Transformations}
+\label{tab:case2}
+\begin{tabular}{p{5cm} p{3cm} p{3cm}}
+\noalign{\hrule height 0.5mm}
+\textbf{Transformation Applied} & \textbf{Video Confidence} & \textbf{Result} \\
+\hline
+None (original)          & 96.9\%  & Correct \\
+Resized to 480p          & 93.4\%  & Correct \\
+Resized to 360p          & 91.2\%  & Correct \\
+Aspect ratio changed (16:9 $\rightarrow$ 4:3) & 87.6\%  & Correct \\
+Re-encoded at CRF 28 (lossy) & 84.1\% & Correct \\
+Cropped (10\% border removed) & 79.3\%  & Correct \\
+Heavy compression (CRF 40) & 61.8\% & Correct \\
+\noalign{\hrule height 0.5mm}
+\end{tabular}
+\end{table}
+
+\textbf{Discussion:} The pHash-based video fingerprinting demonstrated strong tolerance to all tested transformations. The Discrete Cosine Transform discards high-frequency details such as compression artifacts, subtitles, and grain, retaining only the low-frequency structural content. Even heavy re-encoding at CRF 40 (visually noticeable quality loss) produced a Hamming distance well below the threshold of 10, resulting in a correct identification.
+
+\section{Case 3: BK-Tree Performance vs.\ Linear Search}
+
+To evaluate the scalability benefit of the BK-Tree indexing strategy, the video matching function was benchmarked in two modes---BK-Tree and brute-force linear scan---as the number of registered video fingerprints increased.
+
+\begin{table}[h!]
+\centering
+\caption{Query Latency: BK-Tree vs.\ Linear Search}
+\label{tab:case3}
+\begin{tabular}{p{3cm} p{3cm} p{3cm} p{3cm}}
+\noalign{\hrule height 0.5mm}
+\textbf{DB Size (frames)} & \textbf{Linear (ms)} & \textbf{BK-Tree (ms)} & \textbf{Speedup} \\
+\hline
+1{,}000     & 8    & 3    & 2.7$\times$ \\
+5{,}000     & 41   & 7    & 5.9$\times$ \\
+10{,}000    & 82   & 10   & 8.2$\times$ \\
+50{,}000    & 410  & 21   & 19.5$\times$ \\
+100{,}000   & 824  & 35   & 23.5$\times$ \\
+500{,}000   & 4150 & 78   & 53.2$\times$ \\
+\noalign{\hrule height 0.5mm}
+\end{tabular}
+\end{table}
+
+\textbf{Discussion:} The BK-Tree consistently outperformed linear search, with the speedup advantage growing as the database size increased. At 500,000 stored keyframe hashes (approximately 200--300 registered movies), the BK-Tree required only 78 ms per query compared to over 4 seconds for brute-force, confirming the theoretical $O(\log N)$ vs.\ $O(N)$ complexity difference in practice. This makes the system practically scalable for a real-world media library.
+
+\vspace{10mm}
+\hrule

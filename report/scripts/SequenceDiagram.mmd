@@ -1,0 +1,43 @@
+sequenceDiagram
+    autonumber
+    actor User as Client (Browser)
+    participant Auth as AuthContext (React)
+    participant UI as React Component
+    participant API as FastAPI Router
+    participant AuthMW as JWT Middleware
+    participant FFmpeg as FFmpeg Decoder
+    participant Engine as Hash Engine
+    participant DB as PostgreSQL DB
+    
+    User->>UI: Upload query media clip
+    UI->>Auth: Get Bearer Token
+    Auth-->>UI: JWT Token
+    UI->>API: POST /api/identify (MultipartForm)
+    API->>AuthMW: Verify Token
+    AuthMW->>DB: Fetch User Role
+    DB-->>AuthMW: Role (Admin/Mod/Viewer)
+    AuthMW-->>API: Validated User
+    
+    API->>FFmpeg: Extract Audio track
+    FFmpeg-->>API: .wav file
+    API->>Engine: Run Constellation (STFT)
+    Engine-->>API: Audio Hashes
+    
+    API->>DB: SELECT matched hashes (chunked)
+    DB-->>API: Audio Matches
+    API->>Engine: Compute Temporal Alignment
+    Engine-->>API: Audio Confidence Score
+    
+    alt Audio Confidence > 35%
+        API-->>UI: Return Audio Match Result
+    else Audio Confidence <= 35%
+        API->>FFmpeg: Extract Keyframes
+        FFmpeg-->>API: Image Frames
+        API->>Engine: Run DCT pHash
+        Engine-->>API: 64-bit Hex Hashes
+        API->>DB: Query BK-Tree Index (Hamming Dist < 10)
+        DB-->>API: Video Matches
+        API-->>UI: Return Combined Match Result
+    end
+    
+    UI-->>User: Display Confidence & Logs

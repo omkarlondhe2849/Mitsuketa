@@ -1,59 +1,78 @@
 import React, { useState } from 'react';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Library } from 'lucide-react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+import { AuthProvider, useAuth } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
 import IdentifyPage from './pages/IdentifyPage';
 import RegisterPage from './pages/RegisterPage';
 import LibraryPage from './pages/LibraryPage';
+import AdminPanel from './pages/AdminPanel';
+import LandingPage from './pages/LandingPage';
+import HowItWorksPage from './pages/HowItWorksPage';
+import AnimatedBackground from './components/AnimatedBackground';
 
-function App() {
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
+});
+
+// ── Page transition config ─────────────────────────────────────
+const pageVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  exit:    { opacity: 0, y: -16 },
+};
+const pageTransition = { duration: 0.3, ease: [0.16, 1, 0.3, 1] };
+
+// ── Main app (tabs + protected area) ──────────────────────────
+function MainApp() {
+  const { hasRole } = useAuth();
   const [activeTab, setActiveTab] = useState('identify');
 
+  // Build tabs based on role
   const tabs = [
-    { id: 'identify', label: 'Identify', icon: <Search size={18} /> },
-    { id: 'register', label: 'Register Media', icon: <Plus size={18} /> },
-    { id: 'library', label: 'Library', icon: <Library size={18} /> }
+    { id: 'identify', label: 'Identify', icon: <Search size={16} /> },
+    ...(hasRole('moderator', 'admin')
+      ? [{ id: 'register', label: 'Register Media', icon: <Plus size={16} /> }]
+      : []),
+    { id: 'library', label: 'Library', icon: <Library size={16} /> },
   ];
+
+  const pages = {
+    identify: <IdentifyPage />,
+    register: <RegisterPage />,
+    library:  <LibraryPage />,
+  };
 
   return (
     <div className="app-container">
       <Header />
-      
       <main className="main-content">
-        {/* Modern Tab Navigation */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', background: 'rgba(20,20,35,0.5)', padding: '6px', borderRadius: '16px', width: 'fit-content', border: '1px solid rgba(255,255,255,0.08)' }}>
-          {tabs.map((tab) => (
+        {/* Tab Navigation */}
+        <div className="tab-nav">
+          {tabs.map(tab => (
             <button
               key={tab.id}
+              className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 24px',
-                border: 'none',
-                background: 'transparent',
-                color: activeTab === tab.id ? '#fff' : '#94A3B8',
-                fontWeight: 600,
-                fontSize: '0.95rem',
-                cursor: 'pointer',
-                zIndex: 1,
-                fontFamily: 'var(--font-main)'
-              }}
+              id={`tab-${tab.id}`}
             >
               {activeTab === tab.id && (
                 <motion.div
-                  layoutId="activeTabBadge"
+                  layoutId="activeTabBg"
                   style={{
-                    position: 'absolute',
-                    inset: 0,
+                    position: 'absolute', inset: 0,
                     background: 'var(--accent-gradient)',
-                    borderRadius: '12px',
+                    borderRadius: 'var(--radius-md)',
                     zIndex: -1,
-                    boxShadow: '0 4px 14px rgba(124, 58, 237, 0.4)'
+                    boxShadow: '0 4px 12px rgba(99,102,241,0.35)',
                   }}
-                  transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                  transition={{ type: 'spring', bounce: 0.18, duration: 0.55 }}
                 />
               )}
               {tab.icon}
@@ -62,47 +81,93 @@ function App() {
           ))}
         </div>
 
-        {/* Tab Content with animations */}
-        <div style={{ position: 'relative' }}>
-          <AnimatePresence mode="wait">
-            {activeTab === 'identify' && (
-              <motion.div
-                key="identify"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                <IdentifyPage />
-              </motion.div>
-            )}
-            {activeTab === 'register' && (
-              <motion.div
-                key="register"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                <RegisterPage />
-              </motion.div>
-            )}
-            {activeTab === 'library' && (
-              <motion.div
-                key="library"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                <LibraryPage />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        {/* Tab Content with animation */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={pageTransition}
+            className="page-wrapper"
+          >
+            {pages[activeTab]}
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );
 }
 
-export default App;
+// ── Admin layout wrapper ────────────────────────────────────────
+function AdminLayout() {
+  return (
+    <div className="app-container">
+      <Header />
+      <main className="main-content">
+        <AdminPanel />
+      </main>
+    </div>
+  );
+}
+
+// ── Public layout wrapper ────────────────────────────────────────
+function PublicLayout({ children }) {
+  return (
+    <div className="app-container">
+      <Header />
+      <main className="main-content" style={{ padding: 0 }}>
+        {children}
+      </main>
+    </div>
+  );
+}
+
+// ── Route-level page transitions ────────────────────────────────
+function AnimatedRoutes() {
+  const location = useLocation();
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+
+        {/* Public routes */}
+        <Route path="/" element={<motion.div variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={pageTransition}><PublicLayout><LandingPage /></PublicLayout></motion.div>} />
+        <Route path="/how-it-works" element={<motion.div variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={pageTransition}><PublicLayout><HowItWorksPage /></PublicLayout></motion.div>} />
+        <Route path="/login"  element={<motion.div variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={pageTransition}><LoginPage /></motion.div>} />
+        <Route path="/signup" element={<motion.div variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={pageTransition}><SignupPage /></motion.div>} />
+
+        {/* Protected: any authenticated user */}
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <MainApp />
+          </ProtectedRoute>
+        } />
+
+        {/* Protected: admin only */}
+        <Route path="/admin" element={
+          <ProtectedRoute requiredRole="admin">
+            <AdminLayout />
+          </ProtectedRoute>
+        } />
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AnimatePresence>
+  );
+}
+
+// ── Root ────────────────────────────────────────────────────────
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <AnimatedBackground />
+          <AnimatedRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+}

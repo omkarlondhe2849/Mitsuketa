@@ -5,6 +5,9 @@ librosa
 numpy
 opencv-python
 scipy
-Jinja2==3.1.2
 pybktree
 python-dotenv
+psycopg2-binary
+python-jose[cryptography]
+passlib[bcrypt]
+pydantic[email]

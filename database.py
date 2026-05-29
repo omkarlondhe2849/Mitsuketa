@@ -1,251 +1,345 @@
 """
-Database Management Module for Mitsuketa
-Handles SQLite database operations for storing and retrieving fingerprints.
+database.py — Direct PostgreSQL operations for Mitsuketa (psycopg2).
+No ORM, no migrations framework. Pure SQL, clean and fast.
 """
 
-import sqlite3
 import os
-import json
-from datetime import datetime
+import psycopg2
+import psycopg2.extras
+from dotenv import load_dotenv
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mitsuketa.db")
+load_dotenv()
+
+# ─── Connection config ────────────────────────────────────────────────────────
+
+DB_CONFIG = {
+    "host":     os.getenv("DB_HOST", "localhost"),
+    "port":     int(os.getenv("DB_PORT", "5432")),
+    "dbname":   os.getenv("DB_NAME", "mitsuketa"),
+    "user":     os.getenv("DB_USER", "postgres"),
+    "password": os.getenv("DB_PASSWORD", ""),
+}
 
 
 def get_connection():
-    """Get a database connection with row factory."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
+    """Return a psycopg2 connection with RealDictCursor factory."""
+    conn = psycopg2.connect(**DB_CONFIG)
+    conn.cursor_factory = psycopg2.extras.RealDictCursor
     return conn
 
 
+# ─── Schema Init ──────────────────────────────────────────────────────────────
+
 def init_db():
-    """Initialize the database schema."""
+    """Create all tables if they don't exist. Called once on startup."""
     conn = get_connection()
-    cursor = conn.cursor()
+    cur = conn.cursor()
 
-    cursor.executescript("""
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id            SERIAL PRIMARY KEY,
+            username      VARCHAR(30)  UNIQUE NOT NULL,
+            email         VARCHAR(255) UNIQUE NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            role          VARCHAR(20)  NOT NULL DEFAULT 'viewer'
+                          CHECK (role IN ('admin', 'moderator', 'viewer')),
+            is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at    TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+    """)
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS media (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            media_type TEXT NOT NULL CHECK(media_type IN ('song', 'movie', 'unknown')),
-            file_path TEXT,
-            duration REAL,
-            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            id          SERIAL PRIMARY KEY,
+            title       VARCHAR(500) NOT NULL,
+            media_type  VARCHAR(20)  NOT NULL DEFAULT 'unknown'
+                        CHECK (media_type IN ('song', 'movie', 'unknown')),
+            file_path   TEXT,
+            duration    FLOAT,
+            added_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+            uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL
         );
+    """)
 
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS audio_fingerprints (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            media_id INTEGER NOT NULL,
-            fingerprint_hash TEXT NOT NULL,
-            time_offset REAL,
-            FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE CASCADE
+            id               SERIAL PRIMARY KEY,
+            media_id         INTEGER NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+            fingerprint_hash VARCHAR(255) NOT NULL,
+            time_offset      FLOAT
         );
+    """)
 
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS video_fingerprints (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            media_id INTEGER NOT NULL,
+            id          SERIAL PRIMARY KEY,
+            media_id    INTEGER NOT NULL REFERENCES media(id) ON DELETE CASCADE,
             frame_index INTEGER NOT NULL,
-            phash TEXT NOT NULL,
-            FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE CASCADE
+            phash       VARCHAR(255) NOT NULL
         );
-
-        CREATE INDEX IF NOT EXISTS idx_audio_hash ON audio_fingerprints(fingerprint_hash);
-        CREATE INDEX IF NOT EXISTS idx_audio_hash_cover ON audio_fingerprints(fingerprint_hash, media_id, time_offset);
-        CREATE INDEX IF NOT EXISTS idx_video_media ON video_fingerprints(media_id);
-        CREATE INDEX IF NOT EXISTS idx_audio_media ON audio_fingerprints(media_id);
     """)
 
+    # Indexes for fast fingerprint lookups
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_audio_hash       ON audio_fingerprints (fingerprint_hash);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_audio_hash_cover ON audio_fingerprints (fingerprint_hash, media_id, time_offset);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_audio_media      ON audio_fingerprints (media_id);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_video_media      ON video_fingerprints (media_id);")
+
     conn.commit()
+    cur.close()
     conn.close()
+    print("[DB] Schema ready.")
 
 
-def add_media(title: str, media_type: str, file_path: str = None, duration: float = None) -> int:
-    """Add a new media entry and return its ID."""
+# ─── User Operations ──────────────────────────────────────────────────────────
+
+def create_user(username: str, email: str, password_hash: str, role: str = "viewer") -> dict:
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO media (title, media_type, file_path, duration) VALUES (?, ?, ?, ?)",
-        (title, media_type, file_path, duration)
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO users (username, email, password_hash, role)
+           VALUES (%s, %s, %s, %s) RETURNING *""",
+        (username, email, password_hash, role)
     )
-    media_id = cursor.lastrowid
+    user = dict(cur.fetchone())
     conn.commit()
+    cur.close()
     conn.close()
-    return media_id
+    return user
 
 
-def store_audio_fingerprints(media_id: int, fingerprints: list):
-    """
-    Store audio fingerprints for a media entry.
-    fingerprints: list of (hash_str, time_offset) tuples
-    """
+def get_user_by_username(username: str) -> dict | None:
     conn = get_connection()
-    cursor = conn.cursor()
-    
-    # Batch inserts to avoid large transactions and potential limits
-    BATCH_SIZE = 5000
-    for i in range(0, len(fingerprints), BATCH_SIZE):
-        batch = fingerprints[i : i + BATCH_SIZE]
-        cursor.executemany(
-            "INSERT INTO audio_fingerprints (media_id, fingerprint_hash, time_offset) VALUES (?, ?, ?)",
-            [(media_id, fp_hash, offset) for fp_hash, offset in batch]
-        )
-        conn.commit()  # Commit each batch to keep transaction log small
-        
-    conn.close()
-
-
-def store_video_fingerprints(media_id: int, fingerprints: list):
-    """
-    Store video fingerprints for a media entry.
-    fingerprints: list of (frame_index, phash_str) tuples
-    """
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.executemany(
-        "INSERT INTO video_fingerprints (media_id, frame_index, phash) VALUES (?, ?, ?)",
-        [(media_id, frame_idx, phash) for frame_idx, phash in fingerprints]
-    )
-    conn.commit()
-    conn.close()
-
-
-def get_all_audio_fingerprints() -> list:
-    """Get all audio fingerprints grouped by media_id."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT af.fingerprint_hash, af.time_offset, af.media_id, m.title
-        FROM audio_fingerprints af
-        JOIN media m ON af.media_id = m.id
-        ORDER BY af.media_id, af.time_offset
-    """)
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
-def get_audio_fingerprints_by_hash(hash_list: list) -> list:
-    """Get audio fingerprints matching any of the given hashes."""
-    if not hash_list:
-        return []
-        
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    # SQLite has a limit on variables (~999 or 32766 depending on version)
-    # Process in chunks of 500 for safety (well within SQLite limits)
-    CHUNK_SIZE = 500
-    all_rows = []
-    
-    try:
-        for i in range(0, len(hash_list), CHUNK_SIZE):
-            chunk = hash_list[i : i + CHUNK_SIZE]
-            placeholders = ",".join(["?"] * len(chunk))
-            
-            cursor.execute(f"""
-                SELECT af.fingerprint_hash, af.time_offset, af.media_id, m.title
-                FROM audio_fingerprints af
-                JOIN media m ON af.media_id = m.id
-                WHERE af.fingerprint_hash IN ({placeholders})
-            """, chunk)
-            
-            all_rows.extend(cursor.fetchall())
-    except Exception as e:
-        print(f"DATABASE ERROR in get_audio_fingerprints_by_hash: {e}")
-        raise e
-    finally:
-        conn.close()
-    
-    return [dict(r) for r in all_rows]
-
-
-def get_all_video_fingerprints() -> list:
-    """Get all video fingerprints."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT vf.frame_index, vf.phash, vf.media_id, m.title
-        FROM video_fingerprints vf
-        JOIN media m ON vf.media_id = m.id
-        ORDER BY vf.media_id, vf.frame_index
-    """)
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
-def get_media_by_id(media_id: int) -> dict:
-    """Get a media entry by its ID."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM media WHERE id = ?", (media_id,))
-    row = cursor.fetchone()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+    row = cur.fetchone()
+    cur.close()
     conn.close()
     return dict(row) if row else None
 
 
-def get_all_media() -> list:
-    """Get all registered media entries."""
+def get_user_by_email(email: str) -> dict | None:
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT m.*,
-               COUNT(DISTINCT af.id) as audio_fp_count,
-               COUNT(DISTINCT vf.id) as video_fp_count
-        FROM media m
-        LEFT JOIN audio_fingerprints af ON m.id = af.media_id
-        LEFT JOIN video_fingerprints vf ON m.id = vf.media_id
-        GROUP BY m.id
-        ORDER BY m.added_at DESC
-    """)
-    rows = cursor.fetchall()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_all_users() -> list:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users ORDER BY created_at DESC")
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def delete_media(media_id: int) -> bool:
-    """Delete a media entry and its fingerprints."""
+def count_users() -> int:
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM media WHERE id = ?", (media_id,))
-    deleted = cursor.rowcount > 0
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) AS cnt FROM users")
+    count = cur.fetchone()["cnt"]
+    cur.close()
+    conn.close()
+    return count
+
+
+def update_user_role(user_id: int, role: str) -> dict | None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET role = %s WHERE id = %s RETURNING *",
+        (role, user_id)
+    )
+    row = cur.fetchone()
     conn.commit()
+    cur.close()
+    conn.close()
+    return dict(row) if row else None
+
+
+def set_user_active(user_id: int, active: bool) -> bool:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET is_active = %s WHERE id = %s",
+        (active, user_id)
+    )
+    updated = cur.rowcount > 0
+    conn.commit()
+    cur.close()
+    conn.close()
+    return updated
+
+
+# ─── Media Operations ─────────────────────────────────────────────────────────
+
+def add_media(title: str, media_type: str, file_path: str = None,
+              duration: float = None, uploaded_by: int = None) -> int:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO media (title, media_type, file_path, duration, uploaded_by)
+           VALUES (%s, %s, %s, %s, %s) RETURNING id""",
+        (title, media_type, file_path, duration, uploaded_by)
+    )
+    media_id = cur.fetchone()["id"]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return media_id
+
+
+def get_all_media() -> list:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT m.*,
+               (SELECT COUNT(*) FROM audio_fingerprints af WHERE af.media_id = m.id) AS audio_fp_count,
+               (SELECT COUNT(*) FROM video_fingerprints vf WHERE vf.media_id = m.id) AS video_fp_count
+        FROM media m
+        ORDER BY m.added_at DESC
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_media_by_id(media_id: int) -> dict | None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM media WHERE id = %s", (media_id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return dict(row) if row else None
+
+
+def delete_media(media_id: int) -> bool:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM media WHERE id = %s", (media_id,))
+    deleted = cur.rowcount > 0
+    conn.commit()
+    cur.close()
     conn.close()
     return deleted
 
 
 def get_media_count() -> int:
-    """Get total number of registered media."""
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM media")
-    count = cursor.fetchone()[0]
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) AS cnt FROM media")
+    count = cur.fetchone()["cnt"]
+    cur.close()
     conn.close()
     return count
 
 
-def get_audio_hash_table() -> dict:
-    """
-    Load ALL audio fingerprints into a Python dict for in-memory O(1) lookup.
-    Use this to eliminate SQL round-trips during matching for medium libraries.
-    Returns: dict mapping hash_str → list of (media_id, time_offset, title)
-    """
+# ─── Fingerprint Operations ───────────────────────────────────────────────────
+
+def store_audio_fingerprints(media_id: int, fingerprints: list):
+    """fingerprints: list of (hash_str, time_offset) tuples."""
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
+    cur = conn.cursor()
+    BATCH = 5000
+    for i in range(0, len(fingerprints), BATCH):
+        batch = fingerprints[i: i + BATCH]
+        psycopg2.extras.execute_values(
+            cur,
+            "INSERT INTO audio_fingerprints (media_id, fingerprint_hash, time_offset) VALUES %s",
+            [(media_id, h, t) for h, t in batch]
+        )
+        conn.commit()
+    cur.close()
+    conn.close()
+
+
+def store_video_fingerprints(media_id: int, fingerprints: list):
+    """fingerprints: list of (frame_index, phash_str) tuples."""
+    conn = get_connection()
+    cur = conn.cursor()
+    psycopg2.extras.execute_values(
+        cur,
+        "INSERT INTO video_fingerprints (media_id, frame_index, phash) VALUES %s",
+        [(media_id, fi, ph) for fi, ph in fingerprints]
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def get_audio_fingerprints_by_hash(hash_list: list) -> list:
+    """Chunked hash lookup for audio matching (used by matcher.py)."""
+    if not hash_list:
+        return []
+    CHUNK = 500
+    all_rows = []
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        for i in range(0, len(hash_list), CHUNK):
+            chunk = hash_list[i: i + CHUNK]
+            cur.execute("""
+                SELECT af.fingerprint_hash, af.time_offset, af.media_id, m.title
+                FROM audio_fingerprints af
+                JOIN media m ON af.media_id = m.id
+                WHERE af.fingerprint_hash = ANY(%s)
+            """, (chunk,))
+            all_rows.extend(cur.fetchall())
+    finally:
+        cur.close()
+        conn.close()
+    return [dict(r) for r in all_rows]
+
+
+def get_all_video_fingerprints() -> list:
+    """Load all video fingerprints for BK-Tree builder."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT vf.frame_index, vf.phash, vf.media_id, m.title
+        FROM video_fingerprints vf
+        JOIN media m ON vf.media_id = m.id
+        ORDER BY vf.media_id, vf.frame_index
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_audio_hash_table() -> dict:
+    """Load all audio FPs into a dict for fast in-memory lookup."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
         SELECT af.fingerprint_hash, af.time_offset, af.media_id, m.title
         FROM audio_fingerprints af
         JOIN media m ON af.media_id = m.id
     """)
-    rows = cursor.fetchall()
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
-
     table = {}
     for row in rows:
-        h = row['fingerprint_hash']
+        h = row["fingerprint_hash"]
         if h not in table:
             table[h] = []
-        table[h].append((row['media_id'], row['time_offset'], row['title']))
+        table[h].append((row["media_id"], row["time_offset"], row["title"]))
     return table

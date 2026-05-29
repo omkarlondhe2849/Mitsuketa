@@ -1,0 +1,65 @@
+\newpage
+\chapter{Literature Review}
+
+\section{Related Work and State of the Art}
+
+The problem of content-based audio and video identification has been extensively studied in both academic and commercial contexts. The following sub-sections survey the most relevant and impactful work in this domain.
+
+\subsection{Audio Fingerprinting: The Shazam Algorithm}
+The seminal work by Wang~\cite{wang2003} introduced the concept of \textit{Constellation Maps} for audio identification. In this approach, a spectrogram is computed from the audio signal and a set of high-energy time-frequency peaks---referred to as landmarks---is extracted. Pairs of peaks (anchor and target) are combined to form combinatorially robust hash strings. Because the hashes encode relative frequency and time-delta information, they are invariant to global time shifts, making this approach well-suited for identifying snippets recorded from any point within a song.
+
+The critical insight of this algorithm is temporal alignment: during the matching phase, identical hashes found in the database are only considered a true match if their time offsets (the difference between the database absolute time and the query track time) cluster at a single value, indicating that the entire fingerprint constellation has been correctly aligned.
+
+\subsection{Perceptual Hashing for Image and Video Retrieval}
+Perceptual hashing algorithms, first formalized by Zauner~\cite{zauner2010}, compute a compact, fixed-length binary descriptor from visual media such that images with similar visual content produce similar (close Hamming distance) hashes, even after resizing, compression, or minor color changes. The most robust variant, pHash (Discrete Cosine Transform-based), operates by:
+\begin{enumerate}
+  \item Reducing the image to a small fixed size (e.g., 32$\times$32 pixels).
+  \item Applying a 2D Discrete Cosine Transform (DCT) to decompose the image into frequency components.
+  \item Retaining only the low-frequency DCT coefficients, which represent large structural patterns.
+  \item Binarizing coefficients against the median value to produce a 64-bit hash.
+\end{enumerate}
+This approach has been applied to video identification by applying pHash to sampled keyframes and comparing the resulting hash sequences.
+
+\subsection{YouTube Content ID}
+YouTube's Content ID~\cite{youtube2007} is the most deployed commercial video identification system in the world. It creates a digital fingerprint for each piece of content submitted by rights holders and automatically compares it against every video uploaded to YouTube. The system processes both audio and video tracks. However, the internal technical details are proprietary, and access is restricted to content partners.
+
+\subsection{BK-Trees for Metric Space Search}
+The BK-Tree (Burkhard-Keller Tree)~\cite{bk1973} is a data structure designed for efficient nearest-neighbor search in metric spaces. For Hamming distance between binary strings, a BK-Tree allows approximate search in $O(\log N)$ time rather than the linear $O(N)$ brute-force approach. Each node stores a hash, and children are organized by their exact Hamming distance from the parent. A threshold query (``find all hashes within distance $d$") prunes entire subtrees whose distance from the query falls outside the valid range.
+
+\subsection{Product Survey}
+\begin{table}[h!]
+\centering
+\caption{Comparison of Existing Media Identification Systems}
+\label{tab:survey}
+\begin{tabular}{p{3cm} p{2.5cm} p{2.5cm} p{2cm} p{2cm}}
+\noalign{\hrule height 0.5mm}
+\textbf{System} & \textbf{Audio} & \textbf{Video} & \textbf{Local} & \textbf{Open Source} \\
+\hline
+Shazam         & Yes (pHash) & No  & No  & No  \\
+YouTube Content ID & Yes     & Yes & No  & No  \\
+ACRCloud       & Yes         & Yes & No  & No  \\
+Chromaprint    & Yes         & No  & Yes & Yes \\
+\textbf{Mitsuketa} & \textbf{Yes} & \textbf{Yes} & \textbf{Yes} & \textbf{Yes} \\
+\noalign{\hrule height 0.5mm}
+\end{tabular}
+\end{table}
+
+\section{Limitation of State of the Art Techniques}
+Despite the progress made by existing systems, several critical limitations remain:
+\begin{itemize}
+  \item \textbf{Cloud Dependency:} Most production systems (Shazam, Content ID, ACRCloud) are cloud-hosted. This introduces latency, privacy risks, and usage cost constraints.
+  \item \textbf{Opacity:} Commercial systems provide no insight into their internal matching processes, confidence scores, or failure modes, making them unsuitable for academic study.
+  \item \textbf{Scalability of Brute-Force Search:} Open-source tools like Chromaprint do not employ advanced indexing (e.g., BK-Trees) and degrade to linear-time search at large database sizes.
+  \item \textbf{No Hybrid Strategy:} Most systems handle audio or video independently. Systems that combine both streams rarely expose a transparent hybrid confidence metric.
+\end{itemize}
+
+\section{Discussion and Future Direction}
+The literature review reveals a clear opportunity to build a locally-deployable, transparent, and hybrid media identification system. The combination of Shazam-style constellation map hashing for audio and pHash with BK-Tree indexing for video, all served through a modern web API, represents a technically sound and novel integration not found in existing open-source tools.
+
+Future research directions in this space include the use of deep-learning-based embeddings (e.g., contrastive audio representations) for even more robust audio matching, as well as GPU-accelerated fingerprint computation for real-time large-scale indexing.
+
+\section{Concluding Remarks}
+This chapter has surveyed the foundational algorithms and commercial systems that form the basis of the Mitsuketa project. The gaps identified in existing solutions---specifically, the lack of a local, transparent, hybrid audio-video fingerprinting tool---directly motivate the design decisions presented in the remaining chapters.
+
+\vspace{10mm}
+\hrule

@@ -1,0 +1,46 @@
+graph TD
+    subgraph Client [Presentation Layer - React / Vite]
+        UI[UI Components]
+        Routes[React Router DOM]
+        Ctx[Auth Context State]
+        Axios[HTTP Fetch Client]
+        UI <--> Routes
+        UI <--> Ctx
+        Routes <--> Axios
+    end
+
+    subgraph Server [Business Logic Layer - FastAPI]
+        Router[API Endpoints]
+        JWT[JWT Validator]
+        Worker[Media Processing Worker]
+        Matcher[Pattern Matcher]
+        
+        Axios <-->|REST API + Token| Router
+        Router <--> JWT
+        Router --> Worker
+        Worker --> Matcher
+    end
+    
+    subgraph Engine [Multimedia Engine]
+        FFmpeg[FFmpeg CLI]
+        STFT[SciPy STFT / Constellation]
+        DCT[ImageHash / pHash]
+        Worker --> FFmpeg
+        FFmpeg --> STFT
+        FFmpeg --> DCT
+    end
+
+    subgraph Data [Data Layer - PostgreSQL]
+        DB[(PostgreSQL 18)]
+        BKTree[In-Memory BK-Tree Index]
+        UsersTable[users]
+        MediaTable[media]
+        HashTables[audio/video_fingerprints]
+        
+        Matcher <--> DB
+        Matcher <--> BKTree
+        JWT <--> DB
+        DB --- UsersTable
+        DB --- MediaTable
+        DB --- HashTables
+    end

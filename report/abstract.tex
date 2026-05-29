@@ -1,0 +1,14 @@
+\newpage
+\addcontentsline{toc}{chapter}{Abstract}
+\chapter*{Abstract\markboth{Abstract}{}}
+
+\textbf{Mitsuketa} (Japanese for ``Found it") is a locally deployed media fingerprinting and identification system that recognizes audio and video content from short, noisy, or degraded clips---without any cloud dependency. It replicates the core principles of commercial systems like Shazam and YouTube's Content ID using entirely open-source components.
+
+The multimedia engine utilizes a \textit{Constellation Map} approach for audio (extracting STFT spectrogram peaks into time-invariant SHA-1 hashes) and Perceptual Hashing (pHash) for video (using Discrete Cosine Transform to binarize frames into 64-bit hashes). A \textbf{BK-Tree} data structure enables $O(\log N)$ Hamming distance search, replacing brute-force scanning and ensuring real-time identification over large libraries.
+
+A \textbf{FastAPI} backend orchestrates both pipelines, storing fingerprints in a highly scalable \textbf{PostgreSQL} database. A \textbf{React/Vite} frontend featuring a modern white-themed interface with indigo accents and fluid \textbf{Framer Motion} animations displays real-time analysis logs, hash match counts, and a 0--100\% combined confidence score. The system is secured using a \textbf{Role-Based Access Control (RBAC)} architecture supporting Admin, Moderator, and Viewer privileges.
+
+Experimental evaluation confirms audio identification accuracy above 90\% for clips as short as 10 seconds at SNR~=~10~dB, and video identification correctness under resizing, re-encoding, and cropping. BK-Tree indexing achieves a 53$\times$ speedup over linear search at 500,000 stored hashes, validating practical scalability.
+
+\vfill
+\hrule
