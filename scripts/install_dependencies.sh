@@ -27,13 +27,11 @@ apt-get install -y \
     curl
 
 # ── Python Virtual Environment ───────────────────────────
-echo "[STEP 2] Setting up Python virtual environment..."
-if [ ! -d "$APP_DIR/venv" ]; then
-    python3 -m venv "$APP_DIR/venv"
-    echo "  Virtual environment created."
-else
-    echo "  Virtual environment already exists, reusing."
-fi
+echo "[STEP 2] Recreating Python virtual environment (ensures pinned versions)..."
+# Always recreate venv so pinned versions (like Jinja2==3.1.2) are enforced
+rm -rf "$APP_DIR/venv"
+python3 -m venv "$APP_DIR/venv"
+echo "  Virtual environment created fresh."
 
 # ── Activate venv and install packages ───────────────────
 echo "[STEP 3] Installing Python dependencies..."

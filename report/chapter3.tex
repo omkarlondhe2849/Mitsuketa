@@ -1,0 +1,84 @@
+\newpage
+\chapter{Problem Definition and Scope}
+
+\section{Problem Statement}
+Given a large library of registered media files (audio tracks and videos), the system must be able to accept a short, potentially degraded query clip and accurately identify the original source media title along with a confidence score. The query clip may be:
+\begin{itemize}
+  \item As short as 5--10 seconds in duration.
+  \item Recorded via a low-quality microphone in a noisy environment.
+  \item Digitally compressed, re-encoded, or subjected to lossy format conversion.
+  \item Visually altered through resizing, cropping, or aspect ratio changes (for video queries).
+\end{itemize}
+
+Formally, the problem can be stated as: \textit{Given a query snippet $Q$ and a database of fingerprints $\mathcal{D} = \{F_1, F_2, \ldots, F_n\}$, find the media item $M_i \in \mathcal{D}$ such that the similarity score $\text{sim}(Q, M_i)$ is maximized, and report the score with a confidence value between 0 and 100\%.}
+
+\section{Goals and Objectives}
+The key goals and objectives of this project are:
+\begin{enumerate}
+  \item To design and implement a \textbf{dual-mode fingerprinting engine} supporting both audio and video media.
+  \item To achieve accurate identification of media clips with a \textbf{minimum query duration of 5 seconds} under noisy conditions.
+  \item To implement \textbf{efficient logarithmic-time search} using a BK-Tree for video fingerprints, replacing naive linear brute-force.
+  \item To expose a \textbf{transparent confidence metric} that reflects the true statistical strength of each match.
+  \item To build a \textbf{modern, responsive web interface} with fluid animations that displays real-time system diagnostics and analysis logs.
+  \item To implement a secure \textbf{Role-Based Access Control (RBAC)} system for managing user permissions (Admin, Moderator, Viewer).
+  \item To validate the system through \textbf{structured test cases} covering various degradation scenarios.
+\end{enumerate}
+
+\section{Scope and Major Constraints}
+\textbf{In Scope:}
+\begin{itemize}
+  \item Registration and identification of MP3, MP4, WAV, and MKV media files.
+  \item Audio fingerprinting using STFT-based constellation maps.
+  \item Video fingerprinting using pHash on keyframes with BK-Tree indexing.
+  \item A FastAPI-based REST API and a React-based frontend enhanced with Framer Motion.
+  \item Local PostgreSQL database storage with optimized queries.
+  \item Secure authentication and role-based user management.
+\end{itemize}
+
+\textbf{Out of Scope:}
+\begin{itemize}
+  \item Real-time live streaming identification.
+  \item Deep-learning-based audio embeddings (e.g., neural fingerprinting).
+  \item Distributed cloud deployment with load balancing.
+  \item Mobile application development.
+\end{itemize}
+
+\textbf{Major Constraints:}
+\begin{itemize}
+  \item The system relies on FFmpeg being installed and accessible in the system PATH.
+  \item Identification accuracy decreases for very short clips ($<$ 3 seconds).
+  \item The BK-Tree index is rebuilt in memory at server startup and is not persisted between runs.
+\end{itemize}
+
+\section{Hardware and Software Requirements}
+
+\subsection*{Hardware Requirements}
+\begin{itemize}
+  \item Processor: Intel Core i5 or equivalent (minimum); i7 or above (recommended).
+  \item RAM: 4 GB minimum; 8 GB or above recommended.
+  \item Storage: 500 MB for the application; additional space for media library.
+  \item Network: Local loopback sufficient; network access for cloud deployment.
+\end{itemize}
+
+\subsection*{Software Requirements}
+\begin{itemize}
+  \item \textbf{OS:} Windows 10/11, Ubuntu 20.04 LTS, or macOS 12+.
+  \item \textbf{Python:} Version 3.10 or above.
+  \item \textbf{FFmpeg:} Version 4.x or above (added to system PATH).
+  \item \textbf{Node.js:} Version 18+ and npm (for the React frontend).
+  \item \textbf{Python Libraries:} FastAPI, Uvicorn, Librosa, NumPy, SciPy, ImageHash, Pillow, pybktree, OpenCV-headless, psycopg2, bcrypt, python-jose.
+  \item \textbf{Database:} PostgreSQL 18.
+  \item \textbf{Browser:} Any modern browser (Chrome, Firefox, Edge) for the frontend.
+\end{itemize}
+
+\section{Expected Outcomes}
+\begin{itemize}
+  \item A functional end-to-end system capable of registering and identifying audio and video media from short clips.
+  \item Identification accuracy greater than 90\% for audio clips $\geq$ 10 seconds.
+  \item Sub-second query response time for a library of up to 100 registered titles.
+  \item A real-time web interface displaying match results, analysis logs, and confidence scores.
+  \item Demonstrated performance improvement of BK-Tree over linear search at scale ($>$ 1000 stored videos).
+\end{itemize}
+
+\vspace{10mm}
+\hrule

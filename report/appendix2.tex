@@ -1,0 +1,32 @@
+\newpage
+\chapter{SQLite Database Schema}
+
+The following SQL schema defines the three core tables used by Mitsuketa:
+
+\begin{verbatim}
+CREATE TABLE IF NOT EXISTS media (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    title      TEXT NOT NULL,
+    media_type TEXT NOT NULL CHECK(media_type IN ('song','movie')),
+    file_path  TEXT,
+    duration   REAL,
+    added_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS audio_fingerprints (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    media_id         INTEGER NOT NULL REFERENCES media(id)
+                     ON DELETE CASCADE,
+    fingerprint_hash TEXT NOT NULL,
+    time_offset      REAL NOT NULL
+);
+CREATE INDEX idx_audio_hash ON audio_fingerprints(fingerprint_hash);
+
+CREATE TABLE IF NOT EXISTS video_fingerprints (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    media_id    INTEGER NOT NULL REFERENCES media(id)
+                ON DELETE CASCADE,
+    frame_index INTEGER NOT NULL,
+    phash       TEXT NOT NULL
+);
+\end{verbatim}

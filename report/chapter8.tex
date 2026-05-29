@@ -1,0 +1,39 @@
+\newpage
+\chapter{Conclusion}
+
+\section{Conclusion}
+This project successfully designed, implemented, and validated Mitsuketa -- a locally deployable, high-performance media fingerprinting and identification system. The key achievements of the project are summarized as follows:
+
+\begin{enumerate}
+  \item \textbf{Dual-Mode Fingerprinting:} A hybrid audio-video fingerprinting system was built from first principles. The audio engine implements the Shazam-style Constellation Map algorithm using STFT-based spectrogram peak extraction, while the video engine employs Discrete Cosine Transform-based perceptual hashing (pHash) on extracted keyframes.
+
+  \item \textbf{Robustness:} The system demonstrated accurate identification of audio clips as short as 10 seconds at an SNR of 10 dB, and correctly identified videos subjected to resizing, aspect ratio changes, and heavy re-encoding (CRF 40).
+
+  \item \textbf{Scalability:} The integration of a BK-Tree data structure for video hash indexing reduced query latency from over 4 seconds (linear search) to 78 milliseconds at a database size of 500,000 keyframe hashes, demonstrating a 53$\times$ speedup and validating the $O(\log N)$ theoretical complexity.
+
+  \item \textbf{Transparency:} Unlike commercial black-box systems, Mitsuketa exposes its full reasoning process to the user through a real-time analysis log, including hash match counts, temporal alignment offsets, and the final composite confidence score.
+
+  \item \textbf{Modern Full-Stack Architecture:} The system integrates a Python/FastAPI backend, SQLite data layer with WAL-mode concurrency, Numba JIT-accelerated peak detection, and a React/Vite Glassmorphism frontend into a cohesive, production-ready application.
+\end{enumerate}
+
+The project demonstrates that a production-quality media content identification system is achievable entirely with open-source components, without cloud dependency, and with full algorithmic transparency.
+
+\section{Future Scope}
+Several directions exist for extending the capabilities and deployment of Mitsuketa:
+
+\begin{itemize}
+  \item \textbf{Deep Learning Audio Embeddings:} Replace the handcrafted constellation map approach with neural audio fingerprinting models (e.g., Neural Audio Fingerprint by Chang et al.) for improved robustness on extremely short or severely degraded clips.
+
+  \item \textbf{Persistent BK-Tree Index:} Serialize and persist the BK-Tree to disk to eliminate the $O(N)$ index rebuild on every server restart.
+
+  \item \textbf{Real-Time Streaming Identification:} Extend the system to accept a live microphone audio stream and continuously identify playing media in real time, similar to Shazam's mobile application.
+
+  \item \textbf{Cloud Scalability:} Migrate to a distributed database (e.g., PostgreSQL with HNSW vector indexing or Milvus) and containerize the backend with Docker/Kubernetes for horizontal scaling.
+
+  \item \textbf{Mobile Application:} Develop a React Native or Flutter mobile application that records a short clip and submits it to the Mitsuketa API for identification on the go.
+
+  \item \textbf{Copyright Enforcement Module:} Add a policy layer that automatically generates DMCA-compliant takedown reports when copyrighted content is detected, making the system suitable for platform-level copyright enforcement.
+\end{itemize}
+
+\vspace{10mm}
+\hrule

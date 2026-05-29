@@ -1,0 +1,51 @@
+graph TD
+    %% Entities (Rectangles)
+    U[Users]
+    M[Media]
+    AF[Audio_Fingerprints]
+    VF[Video_Fingerprints]
+
+    %% Relationships (Diamonds)
+    R1{Registers}
+    R2{Contains}
+    R3{Contains}
+
+    %% Entity-Relationship Connections
+    U ---|1| R1 ---|N| M
+    M ---|1| R2 ---|N| AF
+    M ---|1| R3 ---|N| VF
+
+    %% User Attributes (Ovals)
+    U --- U_id([id PK])
+    U --- U_user([username])
+    U --- U_email([email])
+    U --- U_pass([hashed_password])
+    U --- U_role([role])
+    U --- U_act([is_active])
+    U --- U_creat([created_at])
+
+    %% Media Attributes
+    M --- M_id([id PK])
+    M --- M_title([title])
+    M --- M_type([type])
+    M --- M_creat([created_at])
+
+    %% Audio Fingerprint Attributes
+    AF --- AF_id([id PK])
+    AF --- AF_mid([media_id FK])
+    AF --- AF_hash([hash])
+    AF --- AF_off([offset])
+
+    %% Video Fingerprint Attributes
+    VF --- VF_id([id PK])
+    VF --- VF_mid([media_id FK])
+    VF --- VF_phash([phash])
+    VF --- VF_idx([frame_index])
+    
+    classDef entity fill:#f9d0c4,stroke:#333,stroke-width:2px;
+    classDef rel fill:#f9f9ca,stroke:#333,stroke-width:2px;
+    classDef attr fill:#d0e6f9,stroke:#333,stroke-width:1px;
+    
+    class U,M,AF,VF entity;
+    class R1,R2,R3 rel;
+    class U_id,U_user,U_email,U_pass,U_role,U_act,U_creat,M_id,M_title,M_type,M_creat,AF_id,AF_mid,AF_hash,AF_off,VF_id,VF_mid,VF_phash,VF_idx attr;

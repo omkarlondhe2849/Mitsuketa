@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Library, Trash2, Search, Music, Film, HelpCircle, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../api/mitsuketa';
+import { useAuth } from '../context/AuthContext';
 
 const DeleteModal = ({ item, onClose, onConfirm }) => (
   <div style={{
@@ -40,6 +41,8 @@ const LibraryPage = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [itemToDelete, setItemToDelete] = useState(null);
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole('admin');
 
   const { data, isLoading } = useQuery({
     queryKey: ['library'],
@@ -135,14 +138,16 @@ const LibraryPage = () => {
                     {new Date(item.created_at).toLocaleDateString()}
                   </span>
                 </div>
-                <button 
-                  onClick={() => setItemToDelete(item)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', transition: 'color var(--transition-fast)' }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
-                >
-                  <Trash2 size={20} />
-                </button>
+                {isAdmin && (
+                  <button 
+                    onClick={() => setItemToDelete(item)}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', transition: 'color var(--transition-fast)' }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
